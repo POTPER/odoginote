@@ -1,6 +1,7 @@
 import {
   createElement,
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -24,9 +25,12 @@ import {
   getWikiLinkContext,
   wrapSelection,
 } from "../lib/markdown-edit";
+import ViewHeader from "./ViewHeader";
+import NoteProperties from "./NoteProperties";
 import EditorToolbar from "./EditorToolbar";
 import WikiLinkSuggest from "./WikiLinkSuggest";
 import PreviewImage from "./PreviewImage";
+import BacklinksPanel from "../panels/BacklinksPanel";
 
 interface Props {
   note: NoteDetail;
@@ -34,10 +38,14 @@ interface Props {
   imageStorage: ImageStorage;
   folderOptions: string[];
   allNotes: NoteSummary[];
+  vaultName?: string;
   onUpdate: (note: NoteDetail) => void;
   onOpenNote?: (number: number, title: string) => void;
   onSaveStatus?: (status: string) => void;
   onContentChange?: (content: string) => void;
+  onEditorModeChange?: (mode: EditorMode) => void;
+  onNavigateFolder?: (folder: string) => void;
+  onEditorStats?: (stats: { words: number; line: number; col: number }) => void;
   onNeedGitHubSession?: () => void;
 }
 
@@ -48,8 +56,35 @@ export interface NoteEditorHandle {
   scrollToLine: (line: number) => void;
 }
 
+function countWords(text: string): number {
+  const t = text.trim();
+  if (!t) return 0;
+  return t.split(/\s+/).length;
+}
+
+function cursorPosition(text: string, pos: number): { line: number; col: number } {
+  const before = text.slice(0, pos);
+  const lines = before.split("\n");
+  return { line: lines.length, col: (lines[lines.length - 1]?.length ?? 0) + 1 };
+}
+
 const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
-  { note, editorMode, imageStorage, folderOptions, allNotes, onUpdate, onOpenNote, onSaveStatus, onContentChange, onNeedGitHubSession },
+  {
+    note,
+    editorMode,
+    imageStorage,
+    folderOptions,
+    allNotes,
+    vaultName,
+    onUpdate,
+    onOpenNote,
+    onSaveStatus,
+    onContentChange,
+    onEditorModeChange,
+    onNavigateFolder,
+    onEditorStats,
+    onNeedGitHubSession,
+  },
   ref
 ) {
   const [title, setTitle] = useState(note.title);
@@ -63,6 +98,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
     cursor: number;
     activeIndex: number;
   } | null>(null);
+  const [scrollTop, setScrollTop] = useState(0);
   const updatedAtRef = useRef(note.updatedAt);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -72,6 +108,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
   const uploadingRef = useRef(false);
   const onUpdateRef = useRef(onUpdate);
   const noteIndexRef = useRef<NoteSummary[]>([]);
+  const syncLockRef = useRef(false);
   const baselineRef = useRef({
     title: note.title,
     content: note.content,
@@ -116,6 +153,18 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
     onContentChange?.(content);
   }, [content, onContentChange]);
 
+  const emitStats = useCallback(
+    (text: string, cursor: number) => {
+      const { line, col } = cursorPosition(text, cursor);
+      onEditorStats?.({ words: countWords(text), line, col });
+    },
+    [onEditorStats]
+  );
+
+  useEffect(() => {
+    emitStats(content, content.length);
+  }, [content, emitStats]);
+
   function scrollToLine(line: number) {
     const mode = editorModeRef.current;
     if (mode === "split" || mode === "edit") {
@@ -129,6 +178,8 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
       ta.setSelectionRange(pos, pos + lineLen);
       const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22;
       ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 3);
+      setScrollTop(ta.scrollTop);
+      emitStats(ta.value, pos);
       return;
     }
 
@@ -222,6 +273,32 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
     return () => clearTimeout(timerRef.current);
   }, [title, content, folder, tagsStr, note.number]);
 
+  const syncPreviewScroll = useCallback(() => {
+    if (editorModeRef.current !== "split") return;
+    const ta = textareaRef.current;
+    const preview = previewRef.current;
+    if (!ta || !preview || syncLockRef.current) return;
+
+    const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22;
+    const currentLine = Math.floor((ta.scrollTop + ta.clientHeight * 0.15) / lineHeight);
+    const headings = extractHeadings(content);
+    let target = headings[0];
+    for (const h of headings) {
+      if (h.line <= currentLine) target = h;
+      else break;
+    }
+    if (!target) return;
+
+    const el = preview.querySelector(`#heading-${target.slug}`);
+    if (el) {
+      syncLockRef.current = true;
+      el.scrollIntoView({ block: "start" });
+      requestAnimationFrame(() => {
+        syncLockRef.current = false;
+      });
+    }
+  }, [content]);
+
   function getFilteredNotes(query: string) {
     return noteIndexRef.current
       .filter(
@@ -241,6 +318,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
       textarea.selectionStart = pos;
       textarea.selectionEnd = pos;
       textarea.focus();
+      emitStats(textarea.value, pos);
     });
   }
 
@@ -310,6 +388,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
     const cursor = e.target.selectionStart;
     setContent(val);
     updateWikiSuggest(val, cursor);
+    emitStats(val, cursor);
   }
 
   async function uploadAndInsertImage(file: File) {
@@ -431,12 +510,18 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
     await openWikiLink(href.slice(5));
   }
 
-  const previewContent = normalizePreviewContent(content);
+  async function handleArchive() {
+    const newState = note.state === "open" ? "closed" : "open";
+    const updated = await api.updateNote(note.number, { state: newState });
+    onUpdate(updated);
+  }
 
+  const previewContent = normalizePreviewContent(content);
   const backlinks = findBacklinks(note.title, note.number, allNotes);
   const folders = [...new Set([...folderOptions, folder, "inbox"])].sort();
-
-  const showEditor = editorMode === "split" || editorMode === "edit";
+  const showSource = editorMode === "split" || editorMode === "edit";
+  const showPreview = editorMode === "split" || editorMode === "preview";
+  const lineCount = content.split("\n").length;
 
   const markdownComponents = useMemo(() => {
     let idx = 0;
@@ -480,123 +565,115 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
     } satisfies Components;
   }, [content, onNeedGitHubSession]);
 
+  const chromeBlock = (
+    <>
+      <input
+        className="inline-title-input"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="无标题"
+      />
+      <NoteProperties
+        folder={folder}
+        folders={folders}
+        tagsStr={tagsStr}
+        updatedAt={note.updatedAt}
+        onFolderChange={setFolder}
+        onTagsChange={setTagsStr}
+      />
+    </>
+  );
+
   return (
     <div className="note-editor">
-      <div className="note-editor-header">
-        <input
-          className="note-title-input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="标题"
-        />
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={status === "uploading"}
-          title="插入图片"
-        >
-          图片
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
-          hidden
-          onChange={handleFilePick}
-        />
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={async () => {
-            const newState = note.state === "open" ? "closed" : "open";
-            const updated = await api.updateNote(note.number, { state: newState });
-            onUpdate(updated);
-          }}
-        >
-          {note.state === "open" ? "归档" : "恢复"}
-        </button>
-      </div>
-
-      <div className="note-meta-row">
-        <label>
-          <span>文件夹</span>
-          <select value={folder} onChange={(e) => setFolder(e.target.value)}>
-            {folders.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>标签</span>
-          <input
-            value={tagsStr}
-            onChange={(e) => setTagsStr(e.target.value)}
-            placeholder="idea, draft"
-          />
-        </label>
-      </div>
-
-      {backlinks.length > 0 && (
-        <div className="backlinks-panel">
-          <span className="backlinks-label">反向链接 ({backlinks.length})</span>
-          <div className="backlinks-list">
-            {backlinks.map((b) => (
-              <button
-                key={b.number}
-                type="button"
-                className="backlink-item"
-                onClick={() => onOpenNote?.(b.number, b.title)}
-              >
-                {b.title}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showEditor && (
-        <EditorToolbar
-          onFormat={applyFormat}
-          onInsertLink={handleInsertWikiLink}
-          disabled={status === "uploading"}
-        />
-      )}
+      <ViewHeader
+        folder={folder}
+        vaultName={vaultName}
+        editorMode={editorMode}
+        onEditorModeChange={(m) => onEditorModeChange?.(m)}
+        onNavigateFolder={(f) => onNavigateFolder?.(f)}
+        onInsertImage={() => fileInputRef.current?.click()}
+        onArchive={() => void handleArchive()}
+        isArchived={note.state === "closed"}
+        imageUploadDisabled={status === "uploading"}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        hidden
+        onChange={handleFilePick}
+      />
 
       <div
         className={`note-editor-body mode-${editorMode}`}
         onClick={editorMode !== "edit" ? handlePreviewClick : undefined}
       >
-        {showEditor && (
-          <div className="note-editor-input-wrap">
-            <textarea
-              ref={textareaRef}
-              className="note-textarea"
-              value={content}
-              onChange={handleContentChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              onClick={(e) => updateWikiSuggest(content, e.currentTarget.selectionStart)}
-              placeholder="Markdown...（[[ 链笔记，支持粘贴/拖拽图片）"
+        {showSource && (
+          <div className="note-source-pane">
+            <div className="note-chrome">{chromeBlock}</div>
+            <EditorToolbar
+              onFormat={applyFormat}
+              onInsertLink={handleInsertWikiLink}
+              disabled={status === "uploading"}
             />
-            {wikiSuggest && (
-              <WikiLinkSuggest
-                items={filteredWikiNotes}
-                activeIndex={wikiSuggest.activeIndex}
-                onSelect={selectWikiLink}
-              />
-            )}
+            <div className="note-source-editor">
+              <div className="line-gutter" aria-hidden="true">
+                <div className="line-gutter-inner" style={{ transform: `translateY(-${scrollTop}px)` }}>
+                  {Array.from({ length: lineCount }, (_, i) => (
+                    <div key={i} className="line-num">
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="note-editor-input-wrap">
+                <textarea
+                  ref={textareaRef}
+                  className="note-textarea"
+                  value={content}
+                  onChange={handleContentChange}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onScroll={(e) => {
+                    setScrollTop(e.currentTarget.scrollTop);
+                    syncPreviewScroll();
+                  }}
+                  onClick={(e) => {
+                    updateWikiSuggest(content, e.currentTarget.selectionStart);
+                    emitStats(content, e.currentTarget.selectionStart);
+                  }}
+                  onKeyUp={(e) => emitStats(content, e.currentTarget.selectionStart)}
+                  placeholder="Markdown...（[[ 链笔记，支持粘贴/拖拽图片）"
+                />
+                {wikiSuggest && (
+                  <WikiLinkSuggest
+                    items={filteredWikiNotes}
+                    activeIndex={wikiSuggest.activeIndex}
+                    onSelect={selectWikiLink}
+                  />
+                )}
+              </div>
+            </div>
           </div>
         )}
-        {(editorMode === "split" || editorMode === "preview") && (
-          <div className="markdown-preview" ref={previewRef}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {previewContent || "*预览*"}
-            </ReactMarkdown>
+
+        {showPreview && (
+          <div className="note-preview-pane">
+            <div className="markdown-preview readable">
+              <div className="readable-inner">
+                {editorMode === "preview" && (
+                  <div className="note-chrome preview-chrome">{chromeBlock}</div>
+                )}
+                {editorMode === "split" && title && <h1 className="readable-title">{title}</h1>}
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                  {previewContent || "*预览*"}
+                </ReactMarkdown>
+                <BacklinksPanel backlinks={backlinks} onOpenNote={onOpenNote} compact />
+              </div>
+            </div>
           </div>
         )}
       </div>

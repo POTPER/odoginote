@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { EditorMode, FileTreeNode, NoteDetail, NoteSummary, SidebarPanel, UserInfo } from "@odoginote/shared";
 import { buildFileTree, canDeleteFolder, todayIsoDate } from "@odoginote/shared";
 import { api } from "../lib/api";
 import { useSettings, useTabs } from "../hooks/useAppState";
+import { useLayoutState } from "../hooks/useLayoutState";
 import { useCommandPalette } from "../hooks/useCommandPalette";
 import { useAppFocus } from "../hooks/useAppFocus";
 import { useAppShortcuts } from "../hooks/useAppShortcuts";
@@ -10,11 +11,12 @@ import { SHORTCUT_HINTS, SHORTCUT_UNFOCUSED_HINT } from "../lib/shortcuts";
 import LeftRibbon from "../layout/LeftRibbon";
 import TabBar from "../layout/TabBar";
 import StatusBar from "../layout/StatusBar";
+import RightSidebar from "../layout/RightSidebar";
+import PaneResizer from "../components/PaneResizer";
 import FileExplorer from "../panels/FileExplorer";
 import SearchPanel from "../panels/SearchPanel";
 import GraphPanel from "../panels/GraphPanel";
 import TagsPanel from "../panels/TagsPanel";
-import OutlinePanel from "../panels/OutlinePanel";
 import SettingsPanel from "../panels/SettingsPanel";
 import VaultSwitcher from "../modals/VaultSwitcher";
 import CommandPalette from "../modals/CommandPalette";
@@ -42,9 +44,11 @@ export default function AppShell({ user, onUserUpdate }: Props) {
   const [vaultSwitcherOpen, setVaultSwitcherOpen] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
   const [editorContent, setEditorContent] = useState("");
+  const [editorStats, setEditorStats] = useState({ words: 0, line: 1, col: 1 });
   const creatingNoteRef = useRef(false);
   const editorRef = useRef<NoteEditorHandle>(null);
   const { settings, updateSettings } = useSettings();
+  const { layout, updateLayout } = useLayoutState();
   const { tabs, activeNumber, setActiveNumber, openTab, closeTab, updateTabTitle, togglePin, reorderTabs } =
     useTabs(vaultKey);
   const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette();
@@ -282,19 +286,41 @@ export default function AppShell({ user, onUserUpdate }: Props) {
     ? `${user.activeVault.repo}`
     : "未选择 Vault";
 
-  const showOutline = settings.showOutline && currentNote != null;
+  const showRightSidebar = settings.showOutline && currentNote != null;
+  const sidebarWidth = layout.sidebarCollapsed ? 0 : layout.sidebarWidth;
+  const rightWidth = layout.rightCollapsed ? 44 : layout.rightWidth;
+
+  const shellStyle = {
+    "--sidebar-width": `${sidebarWidth}px`,
+    "--outline-width": `${rightWidth}px`,
+  } as CSSProperties;
+
+  const handleNavigateFolder = useCallback(
+    (folder: string) => {
+      setPanel("explorer");
+      setActiveFolder(folder);
+    },
+    []
+  );
 
   return (
     <div
       ref={rootRef}
       tabIndex={-1}
       onMouseDown={handleMouseDown}
-      className={`app-shell${showOutline ? " with-outline" : ""}${isFocused ? " app-shell--focused" : " app-shell--unfocused"}`}
+      style={shellStyle}
+      className={`app-shell${showRightSidebar ? " with-outline" : ""}${layout.sidebarCollapsed ? " sidebar-collapsed" : ""}${layout.rightCollapsed ? " right-collapsed" : ""}${isFocused ? " app-shell--focused" : " app-shell--unfocused"}`}
     >
-      <LeftRibbon active={panel} onChange={setPanel} />
+      <LeftRibbon
+        active={panel}
+        onChange={setPanel}
+        sidebarCollapsed={layout.sidebarCollapsed}
+        onToggleSidebar={() => updateLayout({ sidebarCollapsed: !layout.sidebarCollapsed })}
+      />
 
-      <aside className="sidebar-panel">
-        {panel === "explorer" && (
+      {!layout.sidebarCollapsed && (
+        <aside className="sidebar-panel">
+          {panel === "explorer" && (
           <FileExplorer
             tree={tree}
             notes={vaultNotes}
@@ -334,7 +360,13 @@ export default function AppShell({ user, onUserUpdate }: Props) {
             onImageStorageChange={(v) => updateSettings({ imageStorage: v })}
           />
         )}
-      </aside>
+          <PaneResizer
+            onResize={(delta) =>
+              updateLayout({ sidebarWidth: Math.min(480, Math.max(180, layout.sidebarWidth + delta)) })
+            }
+          />
+        </aside>
+      )}
 
       <main className="main-panel">
         <TabBar
@@ -357,10 +389,14 @@ export default function AppShell({ user, onUserUpdate }: Props) {
               imageStorage={settings.imageStorage}
               folderOptions={allFolderOptions}
               allNotes={vaultNotes}
+              vaultName={vaultLabel}
               onOpenNote={handleOpenNote}
               onUpdate={handleNoteUpdate}
               onSaveStatus={setSaveStatus}
               onContentChange={setEditorContent}
+              onEditorModeChange={(m) => updateSettings({ editorMode: m })}
+              onNavigateFolder={handleNavigateFolder}
+              onEditorStats={setEditorStats}
               onNeedGitHubSession={() => setPanel("settings")}
             />
           ) : (
@@ -380,10 +416,21 @@ export default function AppShell({ user, onUserUpdate }: Props) {
         </div>
       </main>
 
-      {showOutline && (
-        <OutlinePanel
+      {showRightSidebar && currentNote && (
+        <RightSidebar
+          panel={layout.rightPanel}
+          onPanelChange={(p) => updateLayout({ rightPanel: p })}
+          collapsed={layout.rightCollapsed}
+          onToggleCollapse={() => updateLayout({ rightCollapsed: !layout.rightCollapsed })}
           content={editorContent}
+          noteTitle={currentNote.title}
+          noteNumber={currentNote.number}
+          notes={vaultNotes}
           onJump={(line) => editorRef.current?.scrollToLine(line)}
+          onOpenNote={handleOpenNote}
+          onResize={(delta) =>
+            updateLayout({ rightWidth: Math.min(400, Math.max(160, layout.rightWidth - delta)) })
+          }
         />
       )}
 
@@ -392,6 +439,9 @@ export default function AppShell({ user, onUserUpdate }: Props) {
         saveStatus={saveStatus}
         noteNumber={activeNumber}
         shortcutHint={!isFocused ? SHORTCUT_UNFOCUSED_HINT : undefined}
+        wordCount={currentNote ? editorStats.words : undefined}
+        cursorLine={currentNote ? editorStats.line : undefined}
+        cursorCol={currentNote ? editorStats.col : undefined}
         onVaultClick={() => setVaultSwitcherOpen(true)}
       />
 
