@@ -1,0 +1,37 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "odoginote",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-01",
+  "workers_dev": true,
+  "account_id": "c3d0c5a2fbea5377b487da2e92c1502a",
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "APP_URL": "https://ginote.yekai.ltd"
+  },
+  "routes": [
+    {
+      "pattern": "ginote.yekai.ltd",
+      "custom_domain": true
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV_SESSION",
+      "id": "bb191b7dfd534b0aae5a65d9de405935",
+      "preview_id": "local-kv-session"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "D1_DB",
+      "database_name": "odoginote-db",
+      "database_id": "7526532e-e06d-433c-8ea1-fb1bf611a5e8",
+      "preview_database_id": "local-d1-db"
+    }
+  ]
+}

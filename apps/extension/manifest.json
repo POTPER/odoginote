@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "GiNote GitHub 会话同步",
+  "version": "1.0.0",
+  "description": "一键将 GitHub user_session 同步到 GiNote，用于图片附件上传与预览",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "GiNote 会话同步",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["cookies", "scripting", "tabs"],
+  "host_permissions": [
+    "https://github.com/*",
+    "https://odoginote.jellyyekai.workers.dev/*",
+    "https://ginote.yekai.ltd/*",
+    "http://localhost:5173/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://odoginote.jellyyekai.workers.dev/*",
+        "https://ginote.yekai.ltd/*",
+        "http://localhost:5173/*"
+      ],
+      "js": ["content-odoginote.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

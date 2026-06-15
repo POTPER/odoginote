@@ -1,0 +1,14 @@
+{
+  "name": "odoginote",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n web,worker -c blue,green \"pnpm --filter @odoginote/web dev\" \"pnpm --filter @odoginote/worker dev\"",
+    "build": "pnpm --filter @odoginote/shared build && pnpm --filter @odoginote/web build && pnpm --filter @odoginote/worker build",
+    "deploy": "pnpm build && pnpm --filter @odoginote/worker run deploy"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  },
+  "packageManager": "pnpm@9.15.9"
+}
