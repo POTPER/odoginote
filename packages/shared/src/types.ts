@@ -10,10 +10,13 @@ export const IMAGE_MIME_EXT: Record<string, string> = {
   "image/webp": "webp",
 };
 
+export type NoteType = "markdown" | "excalidraw" | "ipynb";
+
 export interface NoteMeta {
   folder: string;
   tags: string[];
   daily?: string;
+  type?: NoteType;
 }
 
 export interface NoteSummary {
@@ -22,6 +25,7 @@ export interface NoteSummary {
   folder: string;
   tags: string[];
   daily?: string;
+  type?: NoteType;
   state: "open" | "closed";
   updatedAt: string;
   content?: string;

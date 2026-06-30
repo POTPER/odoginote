@@ -2,6 +2,11 @@ import type { EditorMode, ImageStorage, ThemeMode, UserInfo, VaultSummary } from
 import { useEffect, useState } from "react";
 import { api, logout } from "../lib/api";
 import { isExtensionInstalled, syncGitHubSessionViaExtension } from "../lib/extension-bridge";
+import {
+  loadJupyterConfig,
+  saveJupyterConfig,
+  type JupyterConnectionConfig,
+} from "../lib/kernel-runner";
 
 interface Props {
   user: UserInfo;
@@ -43,6 +48,7 @@ export default function SettingsPanel({
   const [showManualSession, setShowManualSession] = useState(false);
   const [extensionReady, setExtensionReady] = useState(false);
   const [exportStatus, setExportStatus] = useState("");
+  const [jupyterConfig, setJupyterConfig] = useState<JupyterConnectionConfig>(() => loadJupyterConfig());
 
   useEffect(() => {
     api.getGitHubSession().then((s) => {
@@ -269,6 +275,53 @@ export default function SettingsPanel({
 
         {sessionError && <p className="form-error">{sessionError}</p>}
         {sessionSuccess && <p className="form-success">{sessionSuccess}</p>}
+      </section>
+
+      <section className="settings-section">
+        <h3>Jupyter 连接（即将支持）</h3>
+        <p className="panel-muted settings-hint">
+          在 conda 环境中启动本地 Jupyter（如 jupyter lab --no-browser --port=8888），
+          未来将通过浏览器扩展连接以运行 Notebook 代码单元。
+        </p>
+        <label className="settings-row settings-row-block">
+          Server URL
+          <input
+            type="url"
+            value={jupyterConfig.baseUrl}
+            onChange={(e) => {
+              const next = { ...jupyterConfig, baseUrl: e.target.value };
+              setJupyterConfig(next);
+              saveJupyterConfig(next);
+            }}
+            placeholder="http://127.0.0.1:8888"
+          />
+        </label>
+        <label className="settings-row settings-row-block">
+          Token（可选）
+          <input
+            type="password"
+            value={jupyterConfig.token ?? ""}
+            onChange={(e) => {
+              const next = { ...jupyterConfig, token: e.target.value || undefined };
+              setJupyterConfig(next);
+              saveJupyterConfig(next);
+            }}
+            placeholder="Jupyter token"
+          />
+        </label>
+        <label className="settings-row settings-row-block">
+          Kernel 名称（conda 环境）
+          <input
+            type="text"
+            value={jupyterConfig.kernelName ?? ""}
+            onChange={(e) => {
+              const next = { ...jupyterConfig, kernelName: e.target.value || undefined };
+              setJupyterConfig(next);
+              saveJupyterConfig(next);
+            }}
+            placeholder="python3"
+          />
+        </label>
       </section>
 
       <section className="settings-section">

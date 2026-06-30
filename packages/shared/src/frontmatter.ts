@@ -1,4 +1,10 @@
-import type { NoteMeta } from "./types.js";
+import type { NoteMeta, NoteType } from "./types.js";
+
+function parseNoteType(raw: string): NoteType | undefined {
+  const value = raw.replace(/^['"]|['"]$/g, "");
+  if (value === "excalidraw" || value === "markdown" || value === "ipynb") return value;
+  return undefined;
+}
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
@@ -35,6 +41,7 @@ export function parseFrontmatter(body: string): { meta: NoteMeta; content: strin
     if (key === "folder") meta.folder = value.replace(/^['"]|['"]$/g, "") || "inbox";
     if (key === "tags") meta.tags = parseTags(value);
     if (key === "daily") meta.daily = value.replace(/^['"]|['"]$/g, "");
+    if (key === "type") meta.type = parseNoteType(value);
   }
 
   return { meta, content: body.slice(match[0].length).trim() };
@@ -49,6 +56,8 @@ export function serializeFrontmatter(meta: NoteMeta, content: string): string {
     lines.push("tags: []");
   }
   if (meta.daily) lines.push(`daily: ${meta.daily}`);
+  if (meta.type === "excalidraw") lines.push("type: excalidraw");
+  if (meta.type === "ipynb") lines.push("type: ipynb");
   lines.push("---", "", content.trim());
   return lines.join("\n");
 }

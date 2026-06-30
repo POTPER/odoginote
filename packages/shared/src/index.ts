@@ -5,3 +5,5 @@ export * from "./file-tree.js";
 export * from "./folder-utils.js";
 export * from "./wiki.js";
 export * from "./markdown.js";
+export * from "./excalidraw.js";
+export * from "./ipynb.js";

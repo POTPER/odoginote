@@ -107,6 +107,42 @@ export default function AppShell({ user, onUserUpdate }: Props) {
     }
   }, [activeFolder, loadTree, handleOpenNote]);
 
+  const handleNewExcalidrawNote = useCallback(async () => {
+    if (creatingNoteRef.current) return;
+    creatingNoteRef.current = true;
+    setCreatingNote(true);
+    try {
+      const note = await api.createNote({
+        title: "Untitled Drawing",
+        folder: activeFolder ?? "inbox",
+        type: "excalidraw",
+      });
+      await loadTree();
+      handleOpenNote(note.number, note.title);
+    } finally {
+      creatingNoteRef.current = false;
+      setCreatingNote(false);
+    }
+  }, [activeFolder, loadTree, handleOpenNote]);
+
+  const handleNewNotebookNote = useCallback(async () => {
+    if (creatingNoteRef.current) return;
+    creatingNoteRef.current = true;
+    setCreatingNote(true);
+    try {
+      const note = await api.createNote({
+        title: "Untitled Notebook",
+        folder: activeFolder ?? "inbox",
+        type: "ipynb",
+      });
+      await loadTree();
+      handleOpenNote(note.number, note.title);
+    } finally {
+      creatingNoteRef.current = false;
+      setCreatingNote(false);
+    }
+  }, [activeFolder, loadTree, handleOpenNote]);
+
   const handleNewFolder = useCallback(async () => {
     const name = prompt("文件夹名称（可用 / 表示层级，如 projects/docs）");
     if (!name?.trim()) return;
@@ -233,6 +269,8 @@ export default function AppShell({ user, onUserUpdate }: Props) {
   const commands = useMemo(
     () => [
       { id: "new-note", label: "新建笔记", run: () => void handleNewNote() },
+      { id: "new-excalidraw", label: "新建 Excalidraw 笔记", run: () => void handleNewExcalidrawNote() },
+      { id: "new-notebook", label: "新建 Notebook 笔记", run: () => void handleNewNotebookNote() },
       { id: "daily-note", label: "打开今日笔记", run: () => void handleOpenTodayNote() },
       { id: "new-folder", label: "新建文件夹", run: () => void handleNewFolder() },
       { id: "explorer", label: "打开文件浏览", run: () => setPanel("explorer") },
@@ -268,6 +306,8 @@ export default function AppShell({ user, onUserUpdate }: Props) {
     ],
     [
       handleNewNote,
+      handleNewExcalidrawNote,
+      handleNewNotebookNote,
       handleOpenTodayNote,
       handleExportVault,
       handleNewFolder,
@@ -329,6 +369,8 @@ export default function AppShell({ user, onUserUpdate }: Props) {
             onSelectFolder={setActiveFolder}
             onSelectNote={handleOpenNote}
             onNewNote={handleNewNote}
+            onNewExcalidrawNote={handleNewExcalidrawNote}
+            onNewNotebookNote={handleNewNotebookNote}
             onNewFolder={handleNewFolder}
             onDeleteFolder={handleDeleteFolder}
             canDeleteFolder={folderDeletable}
@@ -386,6 +428,7 @@ export default function AppShell({ user, onUserUpdate }: Props) {
               key={currentNote.number}
               note={currentNote}
               editorMode={settings.editorMode}
+              themeMode={settings.theme}
               imageStorage={settings.imageStorage}
               folderOptions={allFolderOptions}
               allNotes={vaultNotes}
@@ -438,6 +481,7 @@ export default function AppShell({ user, onUserUpdate }: Props) {
         vaultLabel={vaultLabel}
         saveStatus={saveStatus}
         noteNumber={activeNumber}
+        noteType={currentNote?.type}
         shortcutHint={!isFocused ? SHORTCUT_UNFOCUSED_HINT : undefined}
         wordCount={currentNote ? editorStats.words : undefined}
         cursorLine={currentNote ? editorStats.line : undefined}

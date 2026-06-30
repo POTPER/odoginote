@@ -5,6 +5,7 @@ import type {
   ImageStorage,
   NoteDetail,
   NoteSummary,
+  NoteType,
   UserInfo,
   VaultSummary,
 } from "@odoginote/shared";
@@ -89,6 +90,7 @@ export const api = {
     folder?: string;
     tags?: string[];
     daily?: string;
+    type?: NoteType;
   }) =>
     request<NoteDetail>("/api/notes", { method: "POST", body: JSON.stringify(data) }),
   updateNote: (

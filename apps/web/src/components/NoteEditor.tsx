@@ -16,8 +16,14 @@ import {
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { EditorMode, ImageStorage, NoteDetail, NoteSummary } from "@odoginote/shared";
-import { extractHeadings, findBacklinks, resolveLink } from "@odoginote/shared";
+import type {
+  EditorMode,
+  ImageStorage,
+  NoteDetail,
+  NoteSummary,
+  ThemeMode,
+} from "@odoginote/shared";
+import { countExcalidrawElements, countNotebookCells, extractHeadings, findBacklinks, resolveLink } from "@odoginote/shared";
 import { api } from "../lib/api";
 import { normalizePreviewContent } from "../lib/image-url";
 import {
@@ -31,10 +37,14 @@ import EditorToolbar from "./EditorToolbar";
 import WikiLinkSuggest from "./WikiLinkSuggest";
 import PreviewImage from "./PreviewImage";
 import BacklinksPanel from "../panels/BacklinksPanel";
+import ExcalidrawEditor from "./ExcalidrawEditor";
+import NotebookEditor from "./NotebookEditor";
+import { nullKernelRunner } from "../lib/kernel-runner";
 
 interface Props {
   note: NoteDetail;
   editorMode: EditorMode;
+  themeMode: ThemeMode;
   imageStorage: ImageStorage;
   folderOptions: string[];
   allNotes: NoteSummary[];
@@ -68,10 +78,17 @@ function cursorPosition(text: string, pos: number): { line: number; col: number 
   return { line: lines.length, col: (lines[lines.length - 1]?.length ?? 0) + 1 };
 }
 
+function resolveEditorTheme(themeMode: ThemeMode): "light" | "dark" {
+  if (themeMode === "light") return "light";
+  if (themeMode === "dark") return "dark";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
   {
     note,
     editorMode,
+    themeMode,
     imageStorage,
     folderOptions,
     allNotes,
@@ -161,9 +178,25 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
     [onEditorStats]
   );
 
+  const isExcalidraw = note.type === "excalidraw";
+  const isNotebook = note.type === "ipynb";
+  const isStructuredNote = isExcalidraw || isNotebook;
+  const excalidrawTheme = resolveEditorTheme(themeMode);
+
   useEffect(() => {
+    if (!isExcalidraw) return;
+    onEditorStats?.({ words: countExcalidrawElements(content), line: 0, col: 0 });
+  }, [content, isExcalidraw, onEditorStats]);
+
+  useEffect(() => {
+    if (!isNotebook) return;
+    onEditorStats?.({ words: countNotebookCells(content), line: 0, col: 0 });
+  }, [content, isNotebook, onEditorStats]);
+
+  useEffect(() => {
+    if (isExcalidraw || isNotebook) return;
     emitStats(content, content.length);
-  }, [content, emitStats]);
+  }, [content, emitStats, isExcalidraw, isNotebook]);
 
   function scrollToLine(line: number) {
     const mode = editorModeRef.current;
@@ -589,6 +622,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
       <ViewHeader
         folder={folder}
         vaultName={vaultName}
+        noteType={note.type}
         editorMode={editorMode}
         onEditorModeChange={(m) => onEditorModeChange?.(m)}
         onNavigateFolder={(f) => onNavigateFolder?.(f)}
@@ -606,9 +640,30 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
       />
 
       <div
-        className={`note-editor-body mode-${editorMode}`}
-        onClick={editorMode !== "edit" ? handlePreviewClick : undefined}
+        className={`note-editor-body mode-${editorMode}${isStructuredNote ? ` mode-${isExcalidraw ? "excalidraw" : "notebook"}` : ""}`}
+        onClick={!isStructuredNote && editorMode !== "edit" ? handlePreviewClick : undefined}
       >
+        {isExcalidraw ? (
+          <div className="note-excalidraw-pane">
+            <div className="note-chrome">{chromeBlock}</div>
+            <ExcalidrawEditor
+              noteNumber={note.number}
+              content={content}
+              theme={excalidrawTheme}
+              onChange={setContent}
+            />
+          </div>
+        ) : isNotebook ? (
+          <div className="note-notebook-pane">
+            <div className="note-chrome">{chromeBlock}</div>
+            <NotebookEditor
+              content={content}
+              onChange={setContent}
+              kernelRunner={nullKernelRunner}
+            />
+          </div>
+        ) : (
+          <>
         {showSource && (
           <div className="note-source-pane">
             <div className="note-chrome">{chromeBlock}</div>
@@ -675,6 +730,8 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

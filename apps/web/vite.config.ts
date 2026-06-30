@@ -21,5 +21,12 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("@excalidraw/excalidraw")) return "excalidraw";
+        },
+      },
+    },
   },
 });

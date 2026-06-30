@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { EditorMode } from "@odoginote/shared";
+import type { EditorMode, NoteType } from "@odoginote/shared";
 
 interface Props {
   folder: string;
   vaultName?: string;
+  noteType?: NoteType;
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
   onNavigateFolder: (folder: string) => void;
@@ -22,6 +23,7 @@ const MODES: { id: EditorMode; label: string; title: string }[] = [
 export default function ViewHeader({
   folder,
   vaultName,
+  noteType,
   editorMode,
   onEditorModeChange,
   onNavigateFolder,
@@ -30,6 +32,7 @@ export default function ViewHeader({
   isArchived,
   imageUploadDisabled,
 }: Props) {
+  const isStructuredNote = noteType === "excalidraw" || noteType === "ipynb";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -70,29 +73,33 @@ export default function ViewHeader({
       </nav>
 
       <div className="view-header-actions">
-        <div className="view-mode-toggle" role="group" aria-label="视图模式">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className={`view-mode-btn${editorMode === m.id ? " active" : ""}`}
-              title={m.title}
-              onClick={() => onEditorModeChange(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        {!isStructuredNote && (
+          <div className="view-mode-toggle" role="group" aria-label="视图模式">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={`view-mode-btn${editorMode === m.id ? " active" : ""}`}
+                title={m.title}
+                onClick={() => onEditorModeChange(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <button
-          type="button"
-          className="view-action-btn"
-          title="插入图片"
-          disabled={imageUploadDisabled}
-          onClick={onInsertImage}
-        >
-          图片
-        </button>
+        {!isStructuredNote && (
+          <button
+            type="button"
+            className="view-action-btn"
+            title="插入图片"
+            disabled={imageUploadDisabled}
+            onClick={onInsertImage}
+          >
+            图片
+          </button>
+        )}
 
         <div className="view-more-menu" ref={menuRef}>
           <button

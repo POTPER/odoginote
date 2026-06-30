@@ -28,7 +28,7 @@ https://odoginote.jellyyekai.workers.dev
 
 ```powershell
 cd C:\Users\odoka\Documents\GitHub\odoginote
-pnpm deploy
+pnpm run deploy:prod
 ```
 
 ## Cloudflare 资源 ID

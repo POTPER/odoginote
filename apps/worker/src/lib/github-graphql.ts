@@ -65,6 +65,7 @@ export async function fetchAllNotes(
         folder: meta.folder,
         tags: meta.tags,
         daily: meta.daily,
+        type: meta.type,
         state: node.state === "OPEN" ? "open" : "closed",
         updatedAt: node.updatedAt,
         content,

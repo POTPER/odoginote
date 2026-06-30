@@ -40,13 +40,13 @@ export default function OnboardingPage({ onComplete }: Props) {
   }
 
   return (
-    <div style={{ maxWidth: 520, margin: "60px auto", padding: 24 }}>
-      <h1 style={{ color: "#fff", marginBottom: 8 }}>设置笔记仓库</h1>
-      <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>
+    <div className="onboarding-page">
+      <h1 className="onboarding-page__title">设置笔记仓库</h1>
+      <p className="onboarding-page__subtitle">
         选择一个 GitHub 仓库来存放笔记。每条笔记对应一个 Issue。
       </p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+      <div className="segmented-control">
         <button
           className={mode === "create" ? "btn" : "btn btn-ghost"}
           onClick={() => setMode("create")}
@@ -62,23 +62,18 @@ export default function OnboardingPage({ onComplete }: Props) {
       </div>
 
       {mode === "create" ? (
-        <label style={{ display: "block", marginBottom: 24 }}>
-          <span style={{ display: "block", marginBottom: 8, color: "var(--text-muted)" }}>仓库名称</span>
+        <label className="form-field">
+          <span className="form-field__label">仓库名称</span>
           <input
             value={repoName}
             onChange={(e) => setRepoName(e.target.value)}
-            style={{ width: "100%", padding: "10px 12px" }}
             placeholder="ginote"
           />
         </label>
       ) : (
-        <label style={{ display: "block", marginBottom: 24 }}>
-          <span style={{ display: "block", marginBottom: 8, color: "var(--text-muted)" }}>选择仓库</span>
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            style={{ width: "100%", padding: "10px 12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)" }}
-          >
+        <label className="form-field">
+          <span className="form-field__label">选择仓库</span>
+          <select value={selected} onChange={(e) => setSelected(e.target.value)}>
             <option value="">-- 选择 --</option>
             {repos.map((r) => (
               <option key={r.fullName} value={r.fullName}>
@@ -89,7 +84,7 @@ export default function OnboardingPage({ onComplete }: Props) {
         </label>
       )}
 
-      {error && <p style={{ color: "var(--danger)", marginBottom: 16 }}>{error}</p>}
+      {error && <p className="form-error">{error}</p>}
 
       <button className="btn" onClick={handleSetup} disabled={loading} style={{ width: "100%" }}>
         {loading ? "设置中..." : "开始使用"}

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "@odoginote/shared": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

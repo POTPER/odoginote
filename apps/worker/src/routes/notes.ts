@@ -2,10 +2,15 @@ import { Hono } from "hono";
 import {
   NOTE_LABEL,
   buildGraph,
+  createEmptyExcalidrawScene,
+  createEmptyNotebook,
   parseFrontmatter,
+  serializeExcalidrawContent,
+  serializeNotebookContent,
   serializeFrontmatter,
   type NoteDetail,
   type NoteMeta,
+  type NoteType,
 } from "@odoginote/shared";
 import type { Env } from "../env";
 import { getSession } from "../lib/session";
@@ -37,6 +42,7 @@ function toDetail(issue: {
     folder: meta.folder,
     tags: meta.tags,
     daily: meta.daily,
+    type: meta.type,
     state: issue.state,
     updatedAt: issue.updated_at,
     content,
@@ -97,14 +103,26 @@ notes.post("/", async (c) => {
     folder?: string;
     tags?: string[];
     daily?: string;
+    type?: NoteType;
   }>();
 
+  const noteType = body.type ?? "markdown";
   const meta: NoteMeta = {
     folder: body.folder ?? "inbox",
     tags: body.tags ?? [],
     daily: body.daily,
+    type:
+      noteType === "excalidraw" || noteType === "ipynb"
+        ? noteType
+        : undefined,
   };
-  const issueBody = serializeFrontmatter(meta, body.content ?? "");
+  const defaultContent =
+    noteType === "excalidraw"
+      ? serializeExcalidrawContent(createEmptyExcalidrawScene())
+      : noteType === "ipynb"
+        ? serializeNotebookContent(createEmptyNotebook())
+        : "";
+  const issueBody = serializeFrontmatter(meta, body.content ?? defaultContent);
 
   const issue = await createIssue(session.token, vault.owner, vault.repo, {
     title: body.title || "Untitled",
@@ -145,6 +163,7 @@ notes.patch("/:number", async (c) => {
       folder: body.folder ?? meta.folder,
       tags: body.tags ?? meta.tags,
       daily: meta.daily,
+      type: meta.type,
     };
     const newContent = body.content ?? content;
     patchBody.body = serializeFrontmatter(newMeta, newContent);

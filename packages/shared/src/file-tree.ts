@@ -7,6 +7,7 @@ export interface FileTreeNode {
   path: string;
   number?: number;
   state?: "open" | "closed";
+  noteType?: "markdown" | "excalidraw" | "ipynb";
   children: FileTreeNode[];
 }
 
@@ -26,6 +27,7 @@ export function buildFileTree(folders: string[], notes: NoteSummary[]): FileTree
             path: `${folder.path}/${n.title}`,
             number: n.number,
             state: n.state,
+            noteType: n.type,
             children: [],
           })
         );

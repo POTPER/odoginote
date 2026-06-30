@@ -9,6 +9,8 @@ interface Props {
   onSelectFolder: (path: string | null) => void;
   onSelectNote: (number: number, title: string) => void;
   onNewNote: () => void;
+  onNewExcalidrawNote: () => void;
+  onNewNotebookNote: () => void;
   onNewFolder: () => void;
   onDeleteFolder?: () => void;
   canDeleteFolder?: boolean;
@@ -23,6 +25,8 @@ export default function FileExplorer({
   onSelectFolder,
   onSelectNote,
   onNewNote,
+  onNewExcalidrawNote,
+  onNewNotebookNote,
   onNewFolder,
   onDeleteFolder,
   canDeleteFolder = false,
@@ -62,6 +66,22 @@ export default function FileExplorer({
       <div className="explorer-toolbar">
         <button type="button" title="新建笔记" onClick={onNewNote} disabled={newNoteDisabled}>
           📄+
+        </button>
+        <button
+          type="button"
+          title="新建 Excalidraw 笔记"
+          onClick={onNewExcalidrawNote}
+          disabled={newNoteDisabled}
+        >
+          ✏️+
+        </button>
+        <button
+          type="button"
+          title="新建 Notebook 笔记"
+          onClick={onNewNotebookNote}
+          disabled={newNoteDisabled}
+        >
+          📓+
         </button>
         <button type="button" title="新建文件夹" onClick={onNewFolder}>
           📁+
@@ -163,6 +183,9 @@ function TreeNodes({
             style={{ paddingLeft: 8 + depth * 14 }}
             onClick={() => onSelectNote(node.number!, node.name)}
           >
+            <span className="tree-note-icon">
+              {node.noteType === "excalidraw" ? "🖊" : node.noteType === "ipynb" ? "📓" : "📄"}
+            </span>
             {node.name}
           </button>
         );
