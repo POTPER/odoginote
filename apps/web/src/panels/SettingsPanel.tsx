@@ -1,6 +1,7 @@
 import type { EditorMode, ImageStorage, ThemeMode, UserInfo, VaultSummary } from "@odoginote/shared";
 import { useEffect, useState } from "react";
 import { api, logout } from "../lib/api";
+import type { UiStyle } from "../hooks/useAppState";
 import { isExtensionInstalled, syncGitHubSessionViaExtension } from "../lib/extension-bridge";
 import {
   loadJupyterConfig,
@@ -9,6 +10,7 @@ import {
 } from "../lib/kernel-runner";
 
 interface Props {
+  variant?: "sidebar" | "modal";
   user: UserInfo;
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
@@ -16,6 +18,8 @@ interface Props {
   onShowArchivedChange: (value: boolean) => void;
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
+  uiStyle: UiStyle;
+  onUiStyleChange: (style: UiStyle) => void;
   showOutline: boolean;
   onShowOutlineChange: (value: boolean) => void;
   imageStorage: ImageStorage;
@@ -25,6 +29,7 @@ interface Props {
 }
 
 export default function SettingsPanel({
+  variant = "sidebar",
   user,
   editorMode,
   onEditorModeChange,
@@ -32,6 +37,8 @@ export default function SettingsPanel({
   onShowArchivedChange,
   theme,
   onThemeChange,
+  uiStyle,
+  onUiStyleChange,
   showOutline,
   onShowOutlineChange,
   imageStorage,
@@ -144,8 +151,8 @@ export default function SettingsPanel({
     imageStorage === "github-attachments" && !sessionConnected && !sessionBusy;
 
   return (
-    <div className="settings-panel">
-      <div className="panel-header">设置</div>
+    <div className={`settings-panel${variant === "modal" ? " settings-panel--modal" : ""}`}>
+      {variant === "sidebar" && <div className="panel-header">设置</div>}
 
       {showSessionGuide && (
         <div className="settings-guide">
@@ -334,6 +341,16 @@ export default function SettingsPanel({
             <option value="system">跟随系统</option>
           </select>
         </label>
+        <label className="settings-row">
+          UI 样式
+          <select value={uiStyle} onChange={(e) => onUiStyleChange(e.target.value as UiStyle)}>
+            <option value="beautiful">美观（默认）</option>
+            <option value="compact">效率简洁</option>
+          </select>
+        </label>
+        <p className="panel-muted settings-hint">
+          效率简洁模式去掉阴影、模糊与动画，布局与功能不变。
+        </p>
       </section>
 
       <section className="settings-section">

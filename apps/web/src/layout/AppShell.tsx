@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { EditorMode, FileTreeNode, NoteDetail, NoteSummary, SidebarPanel, UserInfo } from "@odoginote/shared";
-import { buildFileTree, canDeleteFolder, todayIsoDate } from "@odoginote/shared";
+import { buildFileTree, canDeleteFolder, parseTodoContent, serializeTodoContent, todayIsoDate, updateTodoItem } from "@odoginote/shared";
 import { api } from "../lib/api";
 import { useSettings, useTabs } from "../hooks/useAppState";
 import { useLayoutState } from "../hooks/useLayoutState";
@@ -17,7 +17,8 @@ import FileExplorer from "../panels/FileExplorer";
 import SearchPanel from "../panels/SearchPanel";
 import GraphPanel from "../panels/GraphPanel";
 import TagsPanel from "../panels/TagsPanel";
-import SettingsPanel from "../panels/SettingsPanel";
+import TodoPanel from "../panels/TodoPanel";
+import SettingsModal from "../modals/SettingsModal";
 import VaultSwitcher from "../modals/VaultSwitcher";
 import CommandPalette from "../modals/CommandPalette";
 import QuickSwitcher from "../modals/QuickSwitcher";
@@ -42,6 +43,7 @@ export default function AppShell({ user, onUserUpdate }: Props) {
   const [currentNote, setCurrentNote] = useState<NoteDetail | null>(null);
   const [saveStatus, setSaveStatus] = useState("");
   const [vaultSwitcherOpen, setVaultSwitcherOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
   const [editorContent, setEditorContent] = useState("");
   const [editorStats, setEditorStats] = useState({ words: 0, line: 1, col: 1 });
@@ -143,6 +145,24 @@ export default function AppShell({ user, onUserUpdate }: Props) {
     }
   }, [activeFolder, loadTree, handleOpenNote]);
 
+  const handleNewTodoNote = useCallback(async () => {
+    if (creatingNoteRef.current) return;
+    creatingNoteRef.current = true;
+    setCreatingNote(true);
+    try {
+      const note = await api.createNote({
+        title: "Untitled Todo",
+        folder: activeFolder ?? "inbox",
+        type: "todo",
+      });
+      await loadTree();
+      handleOpenNote(note.number, note.title);
+    } finally {
+      creatingNoteRef.current = false;
+      setCreatingNote(false);
+    }
+  }, [activeFolder, loadTree, handleOpenNote]);
+
   const handleNewFolder = useCallback(async () => {
     const name = prompt("文件夹名称（可用 / 表示层级，如 projects/docs）");
     if (!name?.trim()) return;
@@ -221,14 +241,18 @@ export default function AppShell({ user, onUserUpdate }: Props) {
     if (activeNumber != null) closeTab(activeNumber);
   }, [activeNumber, closeTab]);
 
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+
   const handleCloseModals = useCallback(() => {
     setCmdOpen(false);
     setQsOpen(false);
+    setSettingsOpen(false);
+    setVaultSwitcherOpen(false);
   }, [setCmdOpen, setQsOpen]);
 
   useAppShortcuts({
     enabled: isFocused,
-    modalOpen: cmdOpen || qsOpen,
+    modalOpen: cmdOpen || qsOpen || settingsOpen || vaultSwitcherOpen,
     onToggleCommandPalette: () => setCmdOpen((v) => !v),
     onToggleQuickSwitcher: () => setQsOpen((v) => !v),
     onCloseModals: handleCloseModals,
@@ -248,6 +272,25 @@ export default function AppShell({ user, onUserUpdate }: Props) {
       void loadTree();
     },
     [updateTabTitle, loadTree]
+  );
+
+  const handleToggleTodoItem = useCallback(
+    async (noteNumber: number, groupId: string, itemId: string, done: boolean) => {
+      const cached = vaultNotes.find((n) => n.number === noteNumber);
+      const content =
+        cached?.content ??
+        (await api.getNote(noteNumber)).content;
+      const list = parseTodoContent(content);
+      const updated = updateTodoItem(list, groupId, itemId, { done });
+      const serialized = serializeTodoContent(updated);
+      const note = await api.updateNote(noteNumber, { content: serialized });
+      if (currentNote?.number === noteNumber) {
+        setCurrentNote(note);
+        setEditorContent(serialized);
+      }
+      await loadTree();
+    },
+    [vaultNotes, currentNote, loadTree]
   );
 
   async function refreshUser() {
@@ -271,14 +314,16 @@ export default function AppShell({ user, onUserUpdate }: Props) {
       { id: "new-note", label: "新建笔记", run: () => void handleNewNote() },
       { id: "new-excalidraw", label: "新建 Excalidraw 笔记", run: () => void handleNewExcalidrawNote() },
       { id: "new-notebook", label: "新建 Notebook 笔记", run: () => void handleNewNotebookNote() },
+      { id: "new-todo", label: "新建 Todo 笔记", run: () => void handleNewTodoNote() },
       { id: "daily-note", label: "打开今日笔记", run: () => void handleOpenTodayNote() },
       { id: "new-folder", label: "新建文件夹", run: () => void handleNewFolder() },
       { id: "explorer", label: "打开文件浏览", run: () => setPanel("explorer") },
       { id: "search", label: "打开搜索", run: () => setPanel("search") },
       { id: "tags", label: "打开标签", run: () => setPanel("tags") },
+      { id: "todos", label: "打开待办", run: () => setPanel("todos") },
       { id: "quick-open", label: "快速跳转笔记", run: () => setQsOpen(true) },
       { id: "graph", label: "打开关系图谱", run: () => setPanel("graph") },
-      { id: "settings", label: "打开设置", run: () => setPanel("settings") },
+      { id: "settings", label: "打开设置", run: openSettings },
       {
         id: "export-vault",
         label: "导出笔记到仓库",
@@ -308,6 +353,7 @@ export default function AppShell({ user, onUserUpdate }: Props) {
       handleNewNote,
       handleNewExcalidrawNote,
       handleNewNotebookNote,
+      handleNewTodoNote,
       handleOpenTodayNote,
       handleExportVault,
       handleNewFolder,
@@ -319,6 +365,7 @@ export default function AppShell({ user, onUserUpdate }: Props) {
       settings.editorMode,
       setCmdOpen,
       setQsOpen,
+      openSettings,
     ]
   );
 
@@ -334,6 +381,20 @@ export default function AppShell({ user, onUserUpdate }: Props) {
     "--sidebar-width": `${sidebarWidth}px`,
     "--outline-width": `${rightWidth}px`,
   } as CSSProperties;
+
+  const handlePanelChange = useCallback(
+    (id: SidebarPanel) => {
+      if (id === "settings") {
+        openSettings();
+        return;
+      }
+      setPanel(id);
+      if (layout.sidebarCollapsed) {
+        updateLayout({ sidebarCollapsed: false });
+      }
+    },
+    [layout.sidebarCollapsed, openSettings, updateLayout]
+  );
 
   const handleNavigateFolder = useCallback(
     (folder: string) => {
@@ -353,7 +414,8 @@ export default function AppShell({ user, onUserUpdate }: Props) {
     >
       <LeftRibbon
         active={panel}
-        onChange={setPanel}
+        settingsOpen={settingsOpen}
+        onChange={handlePanelChange}
         sidebarCollapsed={layout.sidebarCollapsed}
         onToggleSidebar={() => updateLayout({ sidebarCollapsed: !layout.sidebarCollapsed })}
       />
@@ -371,6 +433,7 @@ export default function AppShell({ user, onUserUpdate }: Props) {
             onNewNote={handleNewNote}
             onNewExcalidrawNote={handleNewExcalidrawNote}
             onNewNotebookNote={handleNewNotebookNote}
+            onNewTodoNote={handleNewTodoNote}
             onNewFolder={handleNewFolder}
             onDeleteFolder={handleDeleteFolder}
             canDeleteFolder={folderDeletable}
@@ -384,24 +447,16 @@ export default function AppShell({ user, onUserUpdate }: Props) {
             onOpenNote={handleOpenNote}
           />
         )}
-        {panel === "graph" && <GraphPanel key={vaultKey} onOpenNote={handleOpenNote} />}
-        {panel === "settings" && (
-          <SettingsPanel
-            user={user}
-            editorMode={settings.editorMode}
-            onEditorModeChange={(m) => updateSettings({ editorMode: m })}
-            onVaultChange={() => void refreshUser()}
-            onOpenVaultSwitcher={() => setVaultSwitcherOpen(true)}
-            showArchived={settings.showArchived}
-            onShowArchivedChange={(v) => updateSettings({ showArchived: v })}
-            theme={settings.theme}
-            onThemeChange={(t) => updateSettings({ theme: t })}
-            showOutline={settings.showOutline}
-            onShowOutlineChange={(v) => updateSettings({ showOutline: v })}
-            imageStorage={settings.imageStorage}
-            onImageStorageChange={(v) => updateSettings({ imageStorage: v })}
+        {panel === "todos" && (
+          <TodoPanel
+            notes={vaultNotes.filter((n) => settings.showArchived || n.state === "open")}
+            onOpenNote={handleOpenNote}
+            onToggleItem={handleToggleTodoItem}
+            onNewTodoNote={() => void handleNewTodoNote()}
+            newNoteDisabled={creatingNote}
           />
         )}
+        {panel === "graph" && <GraphPanel key={vaultKey} onOpenNote={handleOpenNote} />}
           <PaneResizer
             onResize={(delta) =>
               updateLayout({ sidebarWidth: Math.min(480, Math.max(180, layout.sidebarWidth + delta)) })
@@ -440,7 +495,7 @@ export default function AppShell({ user, onUserUpdate }: Props) {
               onEditorModeChange={(m) => updateSettings({ editorMode: m })}
               onNavigateFolder={handleNavigateFolder}
               onEditorStats={setEditorStats}
-              onNeedGitHubSession={() => setPanel("settings")}
+              onNeedGitHubSession={openSettings}
             />
           ) : (
             <div className="empty-state">
@@ -487,6 +542,29 @@ export default function AppShell({ user, onUserUpdate }: Props) {
         cursorLine={currentNote ? editorStats.line : undefined}
         cursorCol={currentNote ? editorStats.col : undefined}
         onVaultClick={() => setVaultSwitcherOpen(true)}
+      />
+
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        user={user}
+        editorMode={settings.editorMode}
+        onEditorModeChange={(m) => updateSettings({ editorMode: m })}
+        onVaultChange={() => void refreshUser()}
+        onOpenVaultSwitcher={() => {
+          setSettingsOpen(false);
+          setVaultSwitcherOpen(true);
+        }}
+        showArchived={settings.showArchived}
+        onShowArchivedChange={(v) => updateSettings({ showArchived: v })}
+        theme={settings.theme}
+        onThemeChange={(t) => updateSettings({ theme: t })}
+        uiStyle={settings.uiStyle}
+        onUiStyleChange={(v) => updateSettings({ uiStyle: v })}
+        showOutline={settings.showOutline}
+        onShowOutlineChange={(v) => updateSettings({ showOutline: v })}
+        imageStorage={settings.imageStorage}
+        onImageStorageChange={(v) => updateSettings({ imageStorage: v })}
       />
 
       <VaultSwitcher

@@ -10,7 +10,7 @@ export const IMAGE_MIME_EXT: Record<string, string> = {
   "image/webp": "webp",
 };
 
-export type NoteType = "markdown" | "excalidraw" | "ipynb";
+export type NoteType = "markdown" | "excalidraw" | "ipynb" | "todo";
 
 export interface NoteMeta {
   folder: string;
@@ -55,7 +55,7 @@ export interface UserInfo {
   activeVault: VaultConfig | null;
 }
 
-export type SidebarPanel = "explorer" | "search" | "tags" | "graph" | "settings";
+export type SidebarPanel = "explorer" | "search" | "tags" | "todos" | "graph" | "settings";
 
 export type EditorMode = "split" | "edit" | "preview";
 

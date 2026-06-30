@@ -11,6 +11,7 @@ interface Props {
   onNewNote: () => void;
   onNewExcalidrawNote: () => void;
   onNewNotebookNote: () => void;
+  onNewTodoNote: () => void;
   onNewFolder: () => void;
   onDeleteFolder?: () => void;
   canDeleteFolder?: boolean;
@@ -27,6 +28,7 @@ export default function FileExplorer({
   onNewNote,
   onNewExcalidrawNote,
   onNewNotebookNote,
+  onNewTodoNote,
   onNewFolder,
   onDeleteFolder,
   canDeleteFolder = false,
@@ -82,6 +84,14 @@ export default function FileExplorer({
           disabled={newNoteDisabled}
         >
           📓+
+        </button>
+        <button
+          type="button"
+          title="新建 Todo 笔记"
+          onClick={onNewTodoNote}
+          disabled={newNoteDisabled}
+        >
+          ☑+
         </button>
         <button type="button" title="新建文件夹" onClick={onNewFolder}>
           📁+
@@ -184,7 +194,13 @@ function TreeNodes({
             onClick={() => onSelectNote(node.number!, node.name)}
           >
             <span className="tree-note-icon">
-              {node.noteType === "excalidraw" ? "🖊" : node.noteType === "ipynb" ? "📓" : "📄"}
+              {node.noteType === "excalidraw"
+                ? "🖊"
+                : node.noteType === "ipynb"
+                  ? "📓"
+                  : node.noteType === "todo"
+                    ? "☑"
+                    : "📄"}
             </span>
             {node.name}
           </button>

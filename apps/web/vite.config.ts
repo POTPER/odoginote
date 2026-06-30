@@ -25,6 +25,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes("@excalidraw/excalidraw")) return "excalidraw";
+          if (id.includes("mermaid")) return "mermaid";
         },
       },
     },

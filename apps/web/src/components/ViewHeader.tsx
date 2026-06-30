@@ -32,7 +32,7 @@ export default function ViewHeader({
   isArchived,
   imageUploadDisabled,
 }: Props) {
-  const isStructuredNote = noteType === "excalidraw" || noteType === "ipynb";
+  const isStructuredNote = noteType === "excalidraw" || noteType === "ipynb" || noteType === "todo";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

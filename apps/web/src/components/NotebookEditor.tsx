@@ -11,11 +11,13 @@ import {
   type JupyterOutput,
 } from "@odoginote/shared";
 import type { KernelRunner } from "../lib/kernel-runner";
+import { createNotebookMarkdownComponents } from "../lib/markdown-components";
 
 interface Props {
   content: string;
   onChange: (json: string) => void;
   kernelRunner: KernelRunner;
+  theme?: "light" | "dark";
 }
 
 function createMarkdownCell(): JupyterCell {
@@ -52,7 +54,7 @@ function OutputBlock({ output }: { output: JupyterOutput }) {
   );
 }
 
-export default function NotebookEditor({ content, onChange, kernelRunner }: Props) {
+export default function NotebookEditor({ content, onChange, kernelRunner, theme = "dark" }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [runErrors, setRunErrors] = useState<Record<number, string>>({});
@@ -130,6 +132,11 @@ export default function NotebookEditor({ content, onChange, kernelRunner }: Prop
       setRunningCell(null);
     }
   }
+
+  const notebookMarkdownComponents = useMemo(
+    () => createNotebookMarkdownComponents(theme),
+    [theme]
+  );
 
   function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -234,7 +241,7 @@ export default function NotebookEditor({ content, onChange, kernelRunner }: Prop
 
             {cell.cell_type === "markdown" && collapsed.has(index) && (
               <div className="notebook-markdown-preview markdown-preview">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={notebookMarkdownComponents}>
                   {cell.source || "*空 Markdown 单元*"}
                 </ReactMarkdown>
               </div>

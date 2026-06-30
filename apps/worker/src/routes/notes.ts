@@ -4,9 +4,11 @@ import {
   buildGraph,
   createEmptyExcalidrawScene,
   createEmptyNotebook,
+  createEmptyTodoList,
   parseFrontmatter,
   serializeExcalidrawContent,
   serializeNotebookContent,
+  serializeTodoContent,
   serializeFrontmatter,
   type NoteDetail,
   type NoteMeta,
@@ -112,7 +114,7 @@ notes.post("/", async (c) => {
     tags: body.tags ?? [],
     daily: body.daily,
     type:
-      noteType === "excalidraw" || noteType === "ipynb"
+      noteType === "excalidraw" || noteType === "ipynb" || noteType === "todo"
         ? noteType
         : undefined,
   };
@@ -121,7 +123,9 @@ notes.post("/", async (c) => {
       ? serializeExcalidrawContent(createEmptyExcalidrawScene())
       : noteType === "ipynb"
         ? serializeNotebookContent(createEmptyNotebook())
-        : "";
+        : noteType === "todo"
+          ? serializeTodoContent(createEmptyTodoList())
+          : "";
   const issueBody = serializeFrontmatter(meta, body.content ?? defaultContent);
 
   const issue = await createIssue(session.token, vault.owner, vault.repo, {

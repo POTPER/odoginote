@@ -2,7 +2,8 @@ import type { NoteMeta, NoteType } from "./types.js";
 
 function parseNoteType(raw: string): NoteType | undefined {
   const value = raw.replace(/^['"]|['"]$/g, "");
-  if (value === "excalidraw" || value === "markdown" || value === "ipynb") return value;
+  if (value === "excalidraw" || value === "markdown" || value === "ipynb" || value === "todo")
+    return value;
   return undefined;
 }
 
@@ -58,6 +59,7 @@ export function serializeFrontmatter(meta: NoteMeta, content: string): string {
   if (meta.daily) lines.push(`daily: ${meta.daily}`);
   if (meta.type === "excalidraw") lines.push("type: excalidraw");
   if (meta.type === "ipynb") lines.push("type: ipynb");
+  if (meta.type === "todo") lines.push("type: todo");
   lines.push("---", "", content.trim());
   return lines.join("\n");
 }

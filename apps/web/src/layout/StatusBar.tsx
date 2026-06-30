@@ -2,7 +2,7 @@ interface Props {
   vaultLabel: string;
   saveStatus?: string;
   noteNumber?: number | null;
-  noteType?: "markdown" | "excalidraw" | "ipynb";
+  noteType?: "markdown" | "excalidraw" | "ipynb" | "todo";
   shortcutHint?: string;
   wordCount?: number;
   cursorLine?: number;
@@ -23,7 +23,8 @@ export default function StatusBar({
 }: Props) {
   const isExcalidraw = noteType === "excalidraw";
   const isNotebook = noteType === "ipynb";
-  const isStructured = isExcalidraw || isNotebook;
+  const isTodo = noteType === "todo";
+  const isStructured = isExcalidraw || isNotebook || isTodo;
 
   return (
     <footer className="status-bar">
@@ -37,6 +38,11 @@ export default function StatusBar({
       )}
       {wordCount != null && isNotebook && (
         <span className="status-text">{wordCount} 单元格</span>
+      )}
+      {wordCount != null && isTodo && cursorLine != null && (
+        <span className="status-text">
+          {wordCount} 项待办 · {cursorLine} 已完成
+        </span>
       )}
       {wordCount != null && !isStructured && cursorLine != null && cursorCol != null && (
         <span className="status-text">

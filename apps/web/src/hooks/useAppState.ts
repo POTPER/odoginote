@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import type { EditorMode, ImageStorage, ThemeMode } from "@odoginote/shared";
 
+export type UiStyle = "beautiful" | "compact";
+
 export interface AppSettings {
   editorMode: EditorMode;
   showArchived: boolean;
   theme: ThemeMode;
   showOutline: boolean;
   imageStorage: ImageStorage;
+  uiStyle: UiStyle;
 }
 
 const DEFAULT: AppSettings = {
@@ -15,6 +18,7 @@ const DEFAULT: AppSettings = {
   theme: "dark",
   showOutline: true,
   imageStorage: "github-attachments",
+  uiStyle: "beautiful",
 };
 
 function applyTheme(theme: ThemeMode) {
@@ -25,6 +29,10 @@ function applyTheme(theme: ThemeMode) {
         : "light"
       : theme;
   document.documentElement.dataset.theme = resolved;
+}
+
+function applyUiStyle(style: UiStyle) {
+  document.documentElement.dataset.uiStyle = style;
 }
 
 export function useSettings() {
@@ -40,6 +48,10 @@ export function useSettings() {
   useEffect(() => {
     applyTheme(settings.theme);
   }, [settings.theme]);
+
+  useEffect(() => {
+    applyUiStyle(settings.uiStyle);
+  }, [settings.uiStyle]);
 
   useEffect(() => {
     if (settings.theme !== "system") return;

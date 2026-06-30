@@ -1,5 +1,4 @@
 import {
-  createElement,
   forwardRef,
   useCallback,
   useEffect,
@@ -12,9 +11,8 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
-  type ReactNode,
 } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
   EditorMode,
@@ -23,7 +21,7 @@ import type {
   NoteSummary,
   ThemeMode,
 } from "@odoginote/shared";
-import { countExcalidrawElements, countNotebookCells, extractHeadings, findBacklinks, resolveLink } from "@odoginote/shared";
+import { countExcalidrawElements, countNotebookCells, countTodoItems, extractHeadings, findBacklinks, resolveLink } from "@odoginote/shared";
 import { api } from "../lib/api";
 import { normalizePreviewContent } from "../lib/image-url";
 import {
@@ -35,10 +33,11 @@ import ViewHeader from "./ViewHeader";
 import NoteProperties from "./NoteProperties";
 import EditorToolbar from "./EditorToolbar";
 import WikiLinkSuggest from "./WikiLinkSuggest";
-import PreviewImage from "./PreviewImage";
 import BacklinksPanel from "../panels/BacklinksPanel";
+import { createNoteMarkdownComponents } from "../lib/markdown-components";
 import ExcalidrawEditor from "./ExcalidrawEditor";
 import NotebookEditor from "./NotebookEditor";
+import TodoEditor from "./TodoEditor";
 import { nullKernelRunner } from "../lib/kernel-runner";
 
 interface Props {
@@ -180,7 +179,8 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
 
   const isExcalidraw = note.type === "excalidraw";
   const isNotebook = note.type === "ipynb";
-  const isStructuredNote = isExcalidraw || isNotebook;
+  const isTodo = note.type === "todo";
+  const isStructuredNote = isExcalidraw || isNotebook || isTodo;
   const excalidrawTheme = resolveEditorTheme(themeMode);
 
   useEffect(() => {
@@ -194,9 +194,15 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
   }, [content, isNotebook, onEditorStats]);
 
   useEffect(() => {
-    if (isExcalidraw || isNotebook) return;
+    if (!isTodo) return;
+    const { total, done } = countTodoItems(content);
+    onEditorStats?.({ words: total, line: done, col: 0 });
+  }, [content, isTodo, onEditorStats]);
+
+  useEffect(() => {
+    if (isExcalidraw || isNotebook || isTodo) return;
     emitStats(content, content.length);
-  }, [content, emitStats, isExcalidraw, isNotebook]);
+  }, [content, emitStats, isExcalidraw, isNotebook, isTodo]);
 
   function scrollToLine(line: number) {
     const mode = editorModeRef.current;
@@ -556,47 +562,16 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
   const showPreview = editorMode === "split" || editorMode === "preview";
   const lineCount = content.split("\n").length;
 
-  const markdownComponents = useMemo(() => {
-    let idx = 0;
-    const list = extractHeadings(content);
-    const mk = (level: 1 | 2 | 3 | 4 | 5 | 6): Components[`h${typeof level}`] => {
-      const Tag = `h${level}` as keyof Pick<Components, "h1" | "h2" | "h3" | "h4" | "h5" | "h6">;
-      void Tag;
-      return ({ children, ...props }) => {
-        const h = list[idx++];
-        return createElement(`h${level}`, { id: h ? `heading-${h.slug}` : undefined, ...props }, children);
-      };
-    };
-    return {
-      h1: mk(1),
-      h2: mk(2),
-      h3: mk(3),
-      h4: mk(4),
-      h5: mk(5),
-      h6: mk(6),
-      img: ({ src, alt }: { src?: string; alt?: string }) => (
-        <PreviewImage src={src} alt={alt} onNeedGitHubSession={onNeedGitHubSession} />
-      ),
-      a: ({ href, children }: { href?: string; children?: ReactNode }) => {
-        if (href?.startsWith("wiki:")) {
-          const linkTarget = href.slice(5);
-          return (
-            <a
-              href={href}
-              className="wiki-link"
-              onClick={(e) => {
-                e.preventDefault();
-                void openWikiLink(linkTarget);
-              }}
-            >
-              {children}
-            </a>
-          );
-        }
-        return <a href={href}>{children}</a>;
-      },
-    } satisfies Components;
-  }, [content, onNeedGitHubSession]);
+  const markdownComponents = useMemo(
+    () =>
+      createNoteMarkdownComponents({
+        content,
+        theme: excalidrawTheme,
+        onNeedGitHubSession,
+        onOpenWikiLink: (target) => void openWikiLink(target),
+      }),
+    [content, excalidrawTheme, onNeedGitHubSession]
+  );
 
   const chromeBlock = (
     <>
@@ -640,7 +615,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
       />
 
       <div
-        className={`note-editor-body mode-${editorMode}${isStructuredNote ? ` mode-${isExcalidraw ? "excalidraw" : "notebook"}` : ""}`}
+        className={`note-editor-body mode-${editorMode}${isStructuredNote ? ` mode-${isExcalidraw ? "excalidraw" : isNotebook ? "notebook" : "todo"}` : ""}`}
         onClick={!isStructuredNote && editorMode !== "edit" ? handlePreviewClick : undefined}
       >
         {isExcalidraw ? (
@@ -660,7 +635,13 @@ const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
               content={content}
               onChange={setContent}
               kernelRunner={nullKernelRunner}
+              theme={excalidrawTheme}
             />
+          </div>
+        ) : isTodo ? (
+          <div className="note-todo-pane">
+            <div className="note-chrome">{chromeBlock}</div>
+            <TodoEditor content={content} onChange={setContent} />
           </div>
         ) : (
           <>

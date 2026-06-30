@@ -7,7 +7,7 @@ export interface FileTreeNode {
   path: string;
   number?: number;
   state?: "open" | "closed";
-  noteType?: "markdown" | "excalidraw" | "ipynb";
+  noteType?: "markdown" | "excalidraw" | "ipynb" | "todo";
   children: FileTreeNode[];
 }
 
