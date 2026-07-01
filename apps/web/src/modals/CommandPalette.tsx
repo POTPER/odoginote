@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useListKeyboardNav } from "../hooks/useListKeyboardNav";
 
 export interface Command {
   id: string;
@@ -14,7 +15,6 @@ interface Props {
 
 export default function CommandPalette({ open, commands, onClose }: Props) {
   const [filter, setFilter] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
@@ -22,9 +22,16 @@ export default function CommandPalette({ open, commands, onClose }: Props) {
     return commands.filter((c) => c.label.toLowerCase().includes(q));
   }, [commands, filter]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [filter, open]);
+  const { activeIndex, setActiveIndex, handleKeyDown: handleListKeyDown } = useListKeyboardNav({
+    items: filtered,
+    enabled: open,
+    onSelect: (cmd) => {
+      cmd.run();
+      setFilter("");
+      onClose();
+    },
+    onEscape: onClose,
+  });
 
   useEffect(() => {
     if (!open) setFilter("");
@@ -32,26 +39,8 @@ export default function CommandPalette({ open, commands, onClose }: Props) {
 
   if (!open) return null;
 
-  function run(cmd: Command) {
-    cmd.run();
-    setFilter("");
-    onClose();
-  }
-
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, Math.max(filtered.length - 1, 0)));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && filtered.length > 0) {
-      e.preventDefault();
-      run(filtered[activeIndex]);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
+    handleListKeyDown(e);
   }
 
   return (
@@ -72,7 +61,11 @@ export default function CommandPalette({ open, commands, onClose }: Props) {
                 type="button"
                 className={i === activeIndex ? "active" : ""}
                 onMouseEnter={() => setActiveIndex(i)}
-                onClick={() => run(cmd)}
+                onClick={() => {
+                  cmd.run();
+                  setFilter("");
+                  onClose();
+                }}
               >
                 {cmd.label}
               </button>

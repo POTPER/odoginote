@@ -66,10 +66,28 @@ pnpm dev
 
 ## 架构
 
-- **前端**: React + Vite
-- **后端**: Cloudflare Worker + Hono
+- **前端**: React + Vite（`apps/web`）
+- **后端**: Cloudflare Worker + Hono（`apps/worker`）
+- **共享逻辑**: `@odoginote/shared`（类型、frontmatter、wiki、文件树等纯函数）
 - **存储**: GitHub Issues（label: `odoginote:note`）
 - **元数据**: Issue body 顶部 YAML frontmatter（folder、tags）
+
+### 前端分层（`apps/web/src`）
+
+```
+features/
+├── vault/       VaultProvider + useVault（笔记索引、CRUD、draftContent）
+├── editor/      useNotePersistence、MarkdownNoteEditor
+└── commands/    buildCommands（命令面板注册）
+layout/          AppShell 薄壳（布局、快捷键、模态框）
+panels/          侧栏面板
+components/      NoteEditor 路由 + 通用 UI
+hooks/           设置、标签页、快捷键、useListKeyboardNav
+lib/             api、markdown 工具（无 React 状态）
+types/           UI 专用类型（EditorMode、ThemeMode 等）
+```
+
+`AppShell` 通过 `VaultProvider` 提供 vault 上下文；`NoteEditor` 按笔记类型分发到 Markdown / Excalidraw / Notebook / Todo 子编辑器。
 
 ## 部署
 

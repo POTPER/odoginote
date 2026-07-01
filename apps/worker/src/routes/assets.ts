@@ -1,8 +1,6 @@
 import { Hono } from "hono";
 import { IMAGE_MIME_EXT, ASSETS_DIR } from "@odoginote/shared";
 import type { Env } from "../env";
-import { getSession } from "../lib/session";
-import { getActiveVault } from "../lib/db";
 import { getRepoBinaryFile, uploadRepoBinaryFile, getRepo } from "../lib/github-rest";
 import { requireGitHubUserSession, GitHubSessionError, tryGetGitHubUserSession } from "../lib/github-session";
 import { isGitHubAttachmentUrl } from "@odoginote/shared";
@@ -10,18 +8,11 @@ import {
   fetchUserAttachment,
   uploadUserAttachment,
 } from "../lib/github-user-attachments";
+import { requireVault } from "../middleware/require-auth";
 
 const assets = new Hono<{ Bindings: Env }>();
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-async function requireVault(c: { env: Env; req: { raw: Request } }) {
-  const session = await getSession(c.env, c.req.raw);
-  if (!session) return { error: c.json({ error: "Unauthorized" }, 401) };
-  const vault = await getActiveVault(c.env.D1_DB, session.userId);
-  if (!vault) return { error: c.json({ error: "Vault not configured" }, 400) };
-  return { session, vault };
-}
 
 function isValidAssetPath(path: string): boolean {
   return path.startsWith(`${ASSETS_DIR}/`) && !path.includes("..");

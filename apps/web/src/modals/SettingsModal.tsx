@@ -1,46 +1,15 @@
-import type { EditorMode, ImageStorage, ThemeMode, UserInfo } from "@odoginote/shared";
-import type { UiStyle } from "../hooks/useAppState";
 import SettingsPanel from "../panels/SettingsPanel";
+import type { SettingsBundle } from "../types/settings";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  user: UserInfo;
-  editorMode: EditorMode;
-  onEditorModeChange: (mode: EditorMode) => void;
-  showArchived: boolean;
-  onShowArchivedChange: (value: boolean) => void;
-  theme: ThemeMode;
-  onThemeChange: (theme: ThemeMode) => void;
-  uiStyle: UiStyle;
-  onUiStyleChange: (style: UiStyle) => void;
-  showOutline: boolean;
-  onShowOutlineChange: (value: boolean) => void;
-  imageStorage: ImageStorage;
-  onImageStorageChange: (value: ImageStorage) => void;
-  onVaultChange: () => void;
-  onOpenVaultSwitcher: () => void;
+  bundle: SettingsBundle;
 }
 
-export default function SettingsModal({
-  open,
-  onClose,
-  user,
-  editorMode,
-  onEditorModeChange,
-  showArchived,
-  onShowArchivedChange,
-  theme,
-  onThemeChange,
-  uiStyle,
-  onUiStyleChange,
-  showOutline,
-  onShowOutlineChange,
-  imageStorage,
-  onImageStorageChange,
-  onVaultChange,
-  onOpenVaultSwitcher,
-}: Props) {
+export default function SettingsModal({ open, onClose, bundle }: Props) {
+  const { settings, updateSettings, user, onVaultChange, onOpenVaultSwitcher } = bundle;
+
   if (!open) return null;
 
   return (
@@ -67,18 +36,18 @@ export default function SettingsModal({
           <SettingsPanel
             variant="modal"
             user={user}
-            editorMode={editorMode}
-            onEditorModeChange={onEditorModeChange}
-            showArchived={showArchived}
-            onShowArchivedChange={onShowArchivedChange}
-            theme={theme}
-            onThemeChange={onThemeChange}
-            uiStyle={uiStyle}
-            onUiStyleChange={onUiStyleChange}
-            showOutline={showOutline}
-            onShowOutlineChange={onShowOutlineChange}
-            imageStorage={imageStorage}
-            onImageStorageChange={onImageStorageChange}
+            editorMode={settings.editorMode}
+            onEditorModeChange={(mode) => updateSettings({ editorMode: mode })}
+            showArchived={settings.showArchived}
+            onShowArchivedChange={(value) => updateSettings({ showArchived: value })}
+            theme={settings.theme}
+            onThemeChange={(theme) => updateSettings({ theme })}
+            uiStyle={settings.uiStyle}
+            onUiStyleChange={(style) => updateSettings({ uiStyle: style })}
+            showOutline={settings.showOutline}
+            onShowOutlineChange={(value) => updateSettings({ showOutline: value })}
+            imageStorage={settings.imageStorage}
+            onImageStorageChange={(value) => updateSettings({ imageStorage: value })}
             onVaultChange={onVaultChange}
             onOpenVaultSwitcher={onOpenVaultSwitcher}
           />

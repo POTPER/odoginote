@@ -34,10 +34,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getMe: () => request<UserInfo>("/api/auth/me"),
-  listVaults: () =>
-    request<{ vaults: VaultSummary[]; activeVault: { owner: string; repo: string } | null }>(
-      "/api/vaults"
-    ),
   listRepos: () =>
     request<Array<{ name: string; fullName: string; owner: string; private: boolean }>>(
       "/api/vaults/repos"

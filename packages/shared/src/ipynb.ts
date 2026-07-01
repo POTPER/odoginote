@@ -131,3 +131,13 @@ export function getOutputText(output: JupyterOutput): string {
   }
   return "";
 }
+
+export function getOutputMimeData(output: JupyterOutput, mime: string): string | null {
+  if (output.output_type !== "display_data" && output.output_type !== "execute_result") {
+    return null;
+  }
+  const value = output.data?.[mime];
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.join("");
+  return null;
+}

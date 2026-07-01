@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { EditorMode, NoteType } from "@odoginote/shared";
+import type { NoteType } from "@odoginote/shared";
+import type { EditorMode } from "../types/ui";
 
 interface Props {
   folder: string;

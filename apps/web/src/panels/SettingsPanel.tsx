@@ -1,4 +1,5 @@
-import type { EditorMode, ImageStorage, ThemeMode, UserInfo, VaultSummary } from "@odoginote/shared";
+import type { ImageStorage, UserInfo, VaultSummary } from "@odoginote/shared";
+import type { EditorMode, ThemeMode } from "../types/ui";
 import { useEffect, useState } from "react";
 import { api, logout } from "../lib/api";
 import type { UiStyle } from "../hooks/useAppState";
@@ -8,6 +9,11 @@ import {
   saveJupyterConfig,
   type JupyterConnectionConfig,
 } from "../lib/kernel-runner";
+import { testJupyterConnection } from "../lib/jupyter-kernel-runner";
+import {
+  getJupyterSetupSnippet,
+  getProductionRemoteAccessWarning,
+} from "../lib/jupyter-connection-diagnostics";
 
 interface Props {
   variant?: "sidebar" | "modal";
@@ -56,6 +62,23 @@ export default function SettingsPanel({
   const [extensionReady, setExtensionReady] = useState(false);
   const [exportStatus, setExportStatus] = useState("");
   const [jupyterConfig, setJupyterConfig] = useState<JupyterConnectionConfig>(() => loadJupyterConfig());
+  const [jupyterTestMsg, setJupyterTestMsg] = useState<string | null>(null);
+  const [jupyterTestOk, setJupyterTestOk] = useState<boolean | null>(null);
+  const [jupyterTesting, setJupyterTesting] = useState(false);
+  const [jupyterSnippetCopied, setJupyterSnippetCopied] = useState(false);
+
+  const jupyterRemoteWarning = getProductionRemoteAccessWarning(jupyterConfig.baseUrl);
+  const jupyterSetupSnippet = getJupyterSetupSnippet();
+
+  async function copyJupyterSnippet() {
+    try {
+      await navigator.clipboard.writeText(jupyterSetupSnippet);
+      setJupyterSnippetCopied(true);
+      window.setTimeout(() => setJupyterSnippetCopied(false), 2000);
+    } catch {
+      setJupyterSnippetCopied(false);
+    }
+  }
 
   useEffect(() => {
     api.getGitHubSession().then((s) => {
@@ -285,11 +308,21 @@ export default function SettingsPanel({
       </section>
 
       <section className="settings-section">
-        <h3>Jupyter 连接（即将支持）</h3>
+        <h3>Jupyter 连接</h3>
+        {jupyterRemoteWarning && (
+          <p className="jupyter-connection-warning">{jupyterRemoteWarning}</p>
+        )}
         <p className="panel-muted settings-hint">
-          在 conda 环境中启动本地 Jupyter（如 jupyter lab --no-browser --port=8888），
-          未来将通过浏览器扩展连接以运行 Notebook 代码单元。
+          在本机启动 Jupyter Lab，并将下方配置写入{" "}
+          <code>~/.jupyter/jupyter_server_config.py</code> 后重启。本地开发（pnpm dev）会通过{" "}
+          <code>/jupyter</code> 代理，无需 CORS。
         </p>
+        <pre className="jupyter-setup-snippet">{jupyterSetupSnippet}</pre>
+        <div className="settings-row">
+          <button type="button" className="todo-toolbar-btn" onClick={() => void copyJupyterSnippet()}>
+            {jupyterSnippetCopied ? "已复制" : "复制配置"}
+          </button>
+        </div>
         <label className="settings-row settings-row-block">
           Server URL
           <input
@@ -299,12 +332,14 @@ export default function SettingsPanel({
               const next = { ...jupyterConfig, baseUrl: e.target.value };
               setJupyterConfig(next);
               saveJupyterConfig(next);
+              setJupyterTestMsg(null);
+              setJupyterTestOk(null);
             }}
             placeholder="http://127.0.0.1:8888"
           />
         </label>
         <label className="settings-row settings-row-block">
-          Token（可选）
+          Token
           <input
             type="password"
             value={jupyterConfig.token ?? ""}
@@ -313,7 +348,7 @@ export default function SettingsPanel({
               setJupyterConfig(next);
               saveJupyterConfig(next);
             }}
-            placeholder="Jupyter token"
+            placeholder="Jupyter 启动日志中的 token"
           />
         </label>
         <label className="settings-row settings-row-block">
@@ -329,6 +364,36 @@ export default function SettingsPanel({
             placeholder="python3"
           />
         </label>
+        <div className="settings-row">
+          <button
+            type="button"
+            className="todo-toolbar-btn"
+            disabled={jupyterTesting}
+            onClick={async () => {
+              setJupyterTesting(true);
+              setJupyterTestMsg(null);
+              setJupyterTestOk(null);
+              const result = await testJupyterConnection(jupyterConfig);
+              setJupyterTesting(false);
+              if (result.ok) {
+                setJupyterTestOk(true);
+                setJupyterTestMsg(`连接成功：${result.kernels.join("、")}`);
+              } else {
+                setJupyterTestOk(false);
+                setJupyterTestMsg(result.error);
+              }
+            }}
+          >
+            {jupyterTesting ? "测试中…" : "测试连接"}
+          </button>
+        </div>
+        {jupyterTestMsg && (
+          jupyterTestOk ? (
+            <p className="form-success">{jupyterTestMsg}</p>
+          ) : (
+            <pre className="form-error form-error-pre">{jupyterTestMsg}</pre>
+          )
+        )}
       </section>
 
       <section className="settings-section">

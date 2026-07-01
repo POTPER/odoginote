@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { SidebarPanel } from "@odoginote/shared";
+import type { SidebarPanel } from "../types/ui";
 
 interface Props {
   active: SidebarPanel;

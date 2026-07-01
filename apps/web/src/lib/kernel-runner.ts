@@ -15,10 +15,12 @@ export type KernelStatus = "disconnected" | "connecting" | "ready";
 
 export interface KernelRunner {
   readonly status: KernelStatus;
+  readonly displayName?: string;
   connect(config: JupyterConnectionConfig): Promise<void>;
   disconnect(): Promise<void>;
   runCell(code: string, sessionId?: string): Promise<KernelRunResult>;
   interrupt?(): Promise<void>;
+  restart?(): Promise<void>;
 }
 
 const JUPYTER_SETTINGS_KEY = "odoginote.jupyter";
@@ -51,7 +53,7 @@ export class NullKernelRunner implements KernelRunner {
   async runCell(_code: string, _sessionId?: string): Promise<KernelRunResult> {
     return {
       outputs: [],
-      error: "未连接 Jupyter 内核。请在设置中配置本地 Jupyter，并通过扩展连接（即将支持）。",
+      error: "未连接 Jupyter 内核。请在设置中配置本地 Jupyter Server。",
     };
   }
 }

@@ -2,6 +2,7 @@ import type { NoteSummary } from "@odoginote/shared";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { api } from "../lib/api";
 import { highlightMatch } from "../lib/highlight";
+import { useListKeyboardNav } from "../hooks/useListKeyboardNav";
 
 interface Props {
   onOpenNote: (number: number, title: string) => void;
@@ -28,7 +29,12 @@ export default function SearchPanel({ onOpenNote }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NoteSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
+
+  const { activeIndex, setActiveIndex, handleKeyDown: handleListKeyDown } = useListKeyboardNav({
+    items: results,
+    enabled: results.length > 0,
+    onSelect: (n) => onOpenNote(n.number, n.title),
+  });
 
   useEffect(() => {
     if (!query.trim()) {
@@ -50,18 +56,7 @@ export default function SearchPanel({ onOpenNote }: Props) {
   }, [query]);
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (results.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, results.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const n = results[activeIndex];
-      if (n) onOpenNote(n.number, n.title);
-    }
+    handleListKeyDown(e);
   }
 
   return (

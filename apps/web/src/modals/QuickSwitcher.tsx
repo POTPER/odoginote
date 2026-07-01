@@ -1,5 +1,6 @@
 import type { NoteSummary } from "@odoginote/shared";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useListKeyboardNav } from "../hooks/useListKeyboardNav";
 import { highlightMatch } from "../lib/highlight";
 
 interface Props {
@@ -11,7 +12,6 @@ interface Props {
 
 export default function QuickSwitcher({ open, notes, onOpen, onClose }: Props) {
   const [filter, setFilter] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim();
@@ -27,9 +27,16 @@ export default function QuickSwitcher({ open, notes, onOpen, onClose }: Props) {
       .slice(0, 20);
   }, [notes, filter]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [filter, open]);
+  const { activeIndex, setActiveIndex, handleKeyDown: handleListKeyDown } = useListKeyboardNav({
+    items: filtered,
+    enabled: open,
+    onSelect: (n) => {
+      onOpen(n.number, n.title);
+      setFilter("");
+      onClose();
+    },
+    onEscape: onClose,
+  });
 
   useEffect(() => {
     if (!open) setFilter("");
@@ -37,26 +44,8 @@ export default function QuickSwitcher({ open, notes, onOpen, onClose }: Props) {
 
   if (!open) return null;
 
-  function select(n: NoteSummary) {
-    onOpen(n.number, n.title);
-    setFilter("");
-    onClose();
-  }
-
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, Math.max(filtered.length - 1, 0)));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && filtered.length > 0) {
-      e.preventDefault();
-      select(filtered[activeIndex]);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
+    handleListKeyDown(e);
   }
 
   return (
@@ -77,7 +66,11 @@ export default function QuickSwitcher({ open, notes, onOpen, onClose }: Props) {
                 type="button"
                 className={i === activeIndex ? "active" : ""}
                 onMouseEnter={() => setActiveIndex(i)}
-                onClick={() => select(n)}
+                onClick={() => {
+                  onOpen(n.number, n.title);
+                  setFilter("");
+                  onClose();
+                }}
               >
                 <span className="qs-title">
                   {filter ? <HighlightInline text={n.title} query={filter} /> : n.title}

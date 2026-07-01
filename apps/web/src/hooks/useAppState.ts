@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import type { EditorMode, ImageStorage, ThemeMode } from "@odoginote/shared";
+import type { ImageStorage } from "@odoginote/shared";
+import type { EditorMode, ThemeMode } from "../types/ui";
 
 export type UiStyle = "beautiful" | "compact";
 

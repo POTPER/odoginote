@@ -16,6 +16,12 @@ export default defineConfig({
         target: "http://localhost:8787",
         changeOrigin: true,
       },
+      "/jupyter": {
+        target: "http://127.0.0.1:8888",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/jupyter/, ""),
+        ws: true,
+      },
     },
   },
   build: {

@@ -5,7 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Components } from "react-markdown";
-import { extractHeadings } from "@odoginote/shared";
+import { extractHeadings, resolveLink, type NoteSummary } from "@odoginote/shared";
 import PreviewImage from "../components/PreviewImage";
 import MermaidBlock from "../components/MermaidBlock";
 
@@ -49,6 +49,8 @@ function buildCodeHandlers(theme: "light" | "dark"): Pick<Components, "code" | "
 export interface NoteMarkdownOptions {
   content: string;
   theme: "light" | "dark";
+  notes: NoteSummary[];
+  linkMode: "editor" | "reader";
   onNeedGitHubSession?: () => void;
   onOpenWikiLink: (target: string) => void;
 }
@@ -56,6 +58,8 @@ export interface NoteMarkdownOptions {
 export function createNoteMarkdownComponents({
   content,
   theme,
+  notes,
+  linkMode,
   onNeedGitHubSession,
   onOpenWikiLink,
 }: NoteMarkdownOptions): Components {
@@ -81,15 +85,30 @@ export function createNoteMarkdownComponents({
     a: ({ href, children }) => {
       if (href?.startsWith("wiki:")) {
         const linkTarget = href.slice(5);
+        const unresolved = resolveLink(linkTarget, notes) == null;
         return (
           <a
             href={href}
-            className="wiki-link"
+            className={`wiki-link${unresolved ? " unresolved" : ""}`}
+            title={
+              linkMode === "editor"
+                ? unresolved
+                  ? "点击创建笔记"
+                  : "点击打开笔记"
+                : undefined
+            }
             onClick={(e) => {
               e.preventDefault();
               onOpenWikiLink(linkTarget);
             }}
           >
+            {children}
+          </a>
+        );
+      }
+      if (href && /^https?:\/\//.test(href)) {
+        return (
+          <a href={href} target="_blank" rel="noopener noreferrer">
             {children}
           </a>
         );

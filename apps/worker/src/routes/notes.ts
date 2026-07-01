@@ -15,20 +15,11 @@ import {
   type NoteType,
 } from "@odoginote/shared";
 import type { Env } from "../env";
-import { getSession } from "../lib/session";
-import { getActiveVault } from "../lib/db";
 import { GitHubError, createIssue, getIssue, updateIssue } from "../lib/github-rest";
 import { fetchAllNotes } from "../lib/github-graphql";
+import { requireVault } from "../middleware/require-auth";
 
 const notes = new Hono<{ Bindings: Env }>();
-
-async function requireVault(c: { env: Env; req: { raw: Request } }) {
-  const session = await getSession(c.env, c.req.raw);
-  if (!session) return { error: c.json({ error: "Unauthorized" }, 401) };
-  const vault = await getActiveVault(c.env.D1_DB, session.userId);
-  if (!vault) return { error: c.json({ error: "Vault not configured" }, 400) };
-  return { session, vault };
-}
 
 function toDetail(issue: {
   number: number;

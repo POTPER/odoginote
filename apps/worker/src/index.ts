@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "./env";
 import { auth } from "./routes/auth";
-import { repos } from "./routes/repos";
 import { notes } from "./routes/notes";
 import { vaults } from "./routes/vaults";
 import { folders } from "./routes/folders";
@@ -21,7 +20,6 @@ app.use("/api/*", async (c, next) => {
 app.options("/api/*", (c) => c.body(null, 204));
 
 app.route("/api/auth", auth);
-app.route("/api/repos", repos);
 app.route("/api/vaults", vaults);
 app.route("/api/folders", folders);
 app.route("/api/assets", assets);
